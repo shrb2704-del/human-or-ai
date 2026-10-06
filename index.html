@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Человек или ИИ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: a big-screen classroom game. Setup screen, then rounds (two cards + team vote rows + reveal), then a final podium. */
+:root{
+  --bg:#EEF0F7; --surface:#FFFFFF; --ink:#12163A; --muted:#545A7C; --line:#D3D8EB;
+  --accent:#2B4BD6; --accent-ink:#FFFFFF; --ai:#FFB547; --ai-ink:#12163A; --human:#1F8A5B; --bad:#C0392B;
+  --serif:'PT Serif', Georgia, 'Times New Roman', serif;
+  --sans:'Manrope','Segoe UI',Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1030; --surface:#171B47; --ink:#F1F2FA; --muted:#A9AFD6; --line:#2C3270;
+    --accent:#7C98FF; --accent-ink:#0D1030; --human:#48C58F; --bad:#FF7A6B; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1030; --surface:#171B47; --ink:#F1F2FA; --muted:#A9AFD6; --line:#2C3270;
+  --accent:#7C98FF; --accent-ink:#0D1030; --human:#48C58F; --bad:#FF7A6B; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);padding-inline:16px;padding-block:20px 56px;line-height:1.5}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:clamp(30px,5vw,56px);line-height:1.05;margin:0;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+h2{margin:0;text-wrap:balance}
+.lead{color:var(--muted);margin:0;font-size:clamp(17px,2vw,20px);max-width:64ch}
+.btn{font:inherit;font-weight:700;font-size:18px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 26px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.btn:focus-visible,.seg button:focus-visible,.pick:focus-visible,.zoom:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.btn[disabled]{opacity:.5;cursor:default}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.label{font-weight:800;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+
+/* setup */
+.setup{display:grid;gap:20px}
+.field{display:flex;flex-direction:column;gap:10px}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{font:inherit;font-weight:700;background:transparent;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:8px 18px;cursor:pointer;min-width:56px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.names{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.names input{font:inherit;padding:10px 12px;border-radius:8px;border:2px solid var(--line);background:var(--bg);color:var(--ink);min-width:0}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.how div{border-left:4px solid var(--ai);padding-left:12px}
+.how b{display:block}
+
+/* play header */
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 14px;font-weight:700;font-variant-numeric:tabular-nums}
+.chip small{display:block;font-weight:600;color:var(--muted);font-size:13px}
+.progress{display:flex;gap:6px;align-items:center}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--line)}
+.dot.now{background:var(--accent)}
+.kind{font-weight:800;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.timer{position:relative;width:64px;height:64px}
+.timer svg{transform:rotate(-90deg)}
+.timer span{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:22px;font-variant-numeric:tabular-nums}
+
+/* cards */
+.stage{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:760px){.stage{grid-template-columns:1fr}}
+.card{background:var(--surface);border:3px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0;position:relative}
+.card .tag{font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:14px;color:var(--muted)}
+.text{font-family:var(--serif);font-size:clamp(20px,2.2vw,26px);line-height:1.5;white-space:pre-line;margin:0}
+.imgbox{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:4/3;background:var(--bg)}
+.imgbox img{width:100%;height:100%;object-fit:cover;object-position:center 35%;display:block}
+.zoom{position:absolute;right:10px;bottom:10px;font:inherit;font-weight:700;font-size:15px;background:rgba(18,22,58,.78);color:#fff;border:0;border-radius:8px;padding:6px 12px;cursor:pointer}
+.pick{font:inherit;font-weight:800;font-size:18px;background:transparent;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer;margin-top:auto}
+.pick:hover{border-color:var(--accent)}
+.badge{display:none;align-self:flex-start;font-weight:800;font-size:16px;padding:6px 12px;border-radius:8px}
+.source{display:none;margin:0;color:var(--muted);font-size:15px}
+.source a{color:inherit}
+.reveal .badge{display:inline-block}
+.reveal .source{display:block}
+.reveal .pick{display:none}
+.card.is-ai{border-color:var(--ai)}
+.card.is-ai .badge{background:var(--ai);color:var(--ai-ink)}
+.card.is-human{border-color:var(--human)}
+.card.is-human .badge{background:var(--human);color:#fff}
+.card.dim{opacity:.0}
+
+/* votes */
+.votes{display:grid;gap:10px}
+.vote{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;flex-wrap:wrap}
+.vote .nm{font-weight:800;min-width:140px;flex:1}
+.vote .res{font-weight:800;font-variant-numeric:tabular-nums}
+.vote .res.ok{color:var(--human)} .vote .res.no{color:var(--bad)}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 24px;display:flex;flex-direction:column;gap:6px}
+.verdict h2{font-size:26px}
+.verdict p{margin:0;font-size:18px;max-width:72ch}
+
+/* final */
+.podium{display:grid;gap:12px}
+.place{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 22px}
+.place .n{font-weight:800;font-size:34px;width:44px;color:var(--muted)}
+.place.first{border-color:var(--ai);border-width:3px}
+.place .nm{font-weight:800;font-size:24px;flex:1;min-width:0;overflow-wrap:anywhere}
+.place .pt{font-weight:800;font-size:30px;font-variant-numeric:tabular-nums}
+.signs{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:19px;max-width:72ch}
+
+/* overlays */
+.lightbox{position:fixed;inset:0;background:rgba(8,10,30,.92);display:grid;place-items:center;padding:16px;z-index:20}
+.lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px}
+.lightbox button{position:absolute;top:16px;right:16px}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:15}
+[hidden]{display:none!important}
+.hint{color:var(--muted);margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div class="wrap" id="app"></div>
+<div class="lightbox" id="lightbox" hidden><button class="btn" id="lbClose">Закрыть</button><img id="lbImg" alt=""></div>
+
+<script>
+(function(){
+  /* ---------- Data ---------- */
+  var COMMONS = 'https://commons.wikimedia.org/wiki/File:';
+  var rounds = [
+    { kind:'image', aiFirst:true,
+      real:{ src:'img/real_cat.jpg', credit:'Фото: Юрий Д.К., CC BY 4.0, Wikimedia Commons', url:COMMONS+'Cat_in_Efremov,_Russia1.jpg' },
+      ai:{ src:'img/ai_cat.jpg' },
+      clue:'У ИИ-кота хвост торчит странной тёмной кисточкой, а гравий вокруг слишком «резкий» везде. В настоящем фото ракурс сверху искажает пропорции, а асфальт мягко уходит в размытие.' },
+    { kind:'text', aiFirst:false,
+      real:{ text:"Белеет парус одинокий\nВ тумане моря голубом!..\nЧто ищет он в стране далёкой?\nЧто кинул он в краю родном?", src:'М. Ю. Лермонтов, стихотворение «Парус»' },
+      ai:{ text:"Парус тает в дымке рассвета,\nВетер уносит его вдаль.\nСколько в нём тихой надежды\nИ сколько в нём тайной печали." },
+      clue:'У Лермонтова вопросы без ответа и конкретная картинка: одинокий парус в тумане. В тексте ИИ красивые, но общие слова: «надежда», «печаль», «вдаль».' },
+    { kind:'image', aiFirst:false,
+      real:{ src:'img/real_lake.jpg', credit:'Фото: Vyacheslav Argenberg, CC BY 4.0, Wikimedia Commons', url:COMMONS+'Chola_Mountain_Lake,_Nepal.jpg' },
+      ai:{ src:'img/ai_lake.jpg' },
+      clue:'Картинка ИИ выглядит как открытка: идеальная симметрия отражения, насыщенный цвет, чистое небо. Настоящий высокогорный пейзаж «грязнее»: облака, серые осыпи, неровный передний план.' },
+    { kind:'text', aiFirst:true,
+      real:{ text:"Все счастливые семьи похожи друг на друга, каждая несчастливая семья несчастлива по-своему.", src:'Л. Н. Толстой, роман «Анна Каренина»' },
+      ai:{ text:"Каждая семья хранит свои тайны, и именно они делают её уникальной. Счастье и горе переплетаются в стенах дома, формируя характер каждого." },
+      clue:'Толстой одной фразой делает парадокс. ИИ объясняет и обобщает: «именно они делают её уникальной», «формируя характер».' },
+    { kind:'text', aiFirst:true,
+      real:{ text:"Через базарную площадь идёт полицейский надзиратель Очумелов в новой шинели и с узелком в руке.", src:'А. П. Чехов, рассказ «Хамелеон»' },
+      ai:{ text:"Утро выдалось ясным. По оживлённой городской площади шёл полицейский, неся в руках небольшой свёрток, и размышлял о предстоящем дне." },
+      clue:'У Чехова точные детали: фамилия, новая шинель, узелок. ИИ пишет «оживлённая площадь», «небольшой свёрток», «предстоящий день»: слова, которые подходят к любой сцене.' },
+    { kind:'image', aiFirst:false,
+      real:{ src:'img/real_cathedral.jpg', credit:'Фото: Юрий Д.К., CC BY 4.0, Wikimedia Commons', url:COMMONS+'Moscow_-_2025_-_Daytime_view_of_St._Basil%27s_Cathedral_from_Vasilyevsky_Spusk.jpg' },
+      ai:{ src:'img/ai_cathedral.jpg' },
+      clue:'Это самый трудный раунд. ИИ показывает собор «как на открытке»: идеальное небо, яркие цвета, крошечные людишки на площади. Проверяйте мелочи: фигуры людей, окна, надписи, ограды.' },
+    { kind:'text', aiFirst:false,
+      real:{ text:"Мой дядя самых честных правил,\nКогда не в шутку занемог,\nОн уважать себя заставил\nИ лучше выдумать не мог.", src:'А. С. Пушкин, роман в стихах «Евгений Онегин»' },
+      ai:{ text:"Мой дядя был уважаем всеми,\nОн жил достойно и спокойно,\nИ, заболев в преклонном возрасте,\nОн стал примером для людей." },
+      clue:'У Пушкина ирония: «не в шутку занемог», «лучше выдумать не мог». В тексте ИИ нет иронии и точной рифмы, зато есть серьёзная мораль.' },
+    { kind:'image', aiFirst:true,
+      real:{ src:'img/real_fox.jpg', credit:'Фото: Alexis Lours, CC BY 4.0, Wikimedia Commons', url:COMMONS+'Red_Fox_drinking_from_a_lake_in_Gennevilliers,_France.jpg' },
+      ai:{ src:'img/ai_fox.jpg' },
+      clue:'У ИИ-лисы лапа сливается с травой, а отражение в воде показывает только голову и не совпадает с телом. У настоящей лисы отражение целое, хвост и задние лапы видны.' },
+    { kind:'text', aiFirst:true,
+      real:{ text:"В ворота гостиницы губернского города NN въехала довольно красивая рессорная небольшая бричка, в какой ездят холостяки: отставные подполковники, штабс-капитаны, помещики, имеющие около сотни душ крестьян.", src:'Н. В. Гоголь, поэма «Мёртвые души»' },
+      ai:{ text:"В небольшой провинциальный город въехал экипаж, в котором сидел скромно одетый господин средних лет. Горожане с любопытством смотрели ему вслед, гадая, кто он и зачем приехал." },
+      clue:'Гоголь перечисляет конкретных людей и смешные подробности («около сотни душ»). ИИ даёт «скромно одетого господина средних лет» и «любопытство», обычную схему завязки.' },
+    { kind:'text', aiFirst:false,
+      real:{ text:"В человеке всё должно быть прекрасно: и лицо, и одежда, и душа, и мысли.", src:'А. П. Чехов, пьеса «Дядя Ваня»' },
+      ai:{ text:"Настоящая красота человека заключается в гармонии внешнего и внутреннего: в чистоте мыслей, доброте сердца и умении ценить окружающих." },
+      clue:'Чехов называет четыре вещи просто и сразу. ИИ добавляет «настоящую красоту», «гармонию» и список добродетелей, то есть мораль в виде набора общих слов.' }
+  ];
+
+  /* ---------- Helpers ---------- */
+  var app = document.getElementById('app');
+  function h(tag, attrs, kids){
+    var n = document.createElement(tag);
+    if(attrs) for(var k in attrs){
+      if(k==='class') n.className = attrs[k];
+      else if(k==='text') n.textContent = attrs[k];
+      else if(k.indexOf('on')===0) n.addEventListener(k.slice(2), attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    }
+    (kids||[]).forEach(function(c){ if(c) n.appendChild(typeof c==='string' ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function clear(n){ while(n.firstChild) n.removeChild(n.firstChild); }
+  function store(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function load(k, d){ try{ var v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } }
+
+  /* ---------- Sound and confetti ---------- */
+  var actx = null;
+  function tone(freq, dur, type, vol, delay){
+    if(!S.sound) return;
+    try{
+      actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+      var o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + (delay||0);
+      o.type = type||'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol||0.12, t); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur);
+    }catch(e){}
+  }
+  function sfxOk(){ tone(523,.15,'triangle',.14,0); tone(659,.15,'triangle',.14,.12); tone(784,.28,'triangle',.14,.24); }
+  function sfxNo(){ tone(220,.3,'sawtooth',.08,0); tone(165,.4,'sawtooth',.08,.18); }
+  function sfxTick(){ tone(880,.06,'square',.05,0); }
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function confetti(){
+    if(reduce) return;
+    var c = document.getElementById('confetti'), x = c.getContext('2d');
+    c.width = innerWidth; c.height = innerHeight;
+    var cols = ['#FFB547','#2B4BD6','#1F8A5B','#FF6B6B','#7C98FF'], ps = [];
+    for(var i=0;i<110;i++) ps.push({x:Math.random()*c.width,y:-20-Math.random()*c.height*.4,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,s:6+Math.random()*7,r:Math.random()*6,vr:(Math.random()-.5)*.3,c:cols[i%cols.length]});
+    var f = 0;
+    (function step(){
+      x.clearRect(0,0,c.width,c.height);
+      ps.forEach(function(p){ p.x+=p.vx; p.y+=p.vy; p.r+=p.vr; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/3,p.s,p.s*.6); x.restore(); });
+      if(++f<150) requestAnimationFrame(step); else x.clearRect(0,0,c.width,c.height);
+    })();
+  }
+
+  /* ---------- State ---------- */
+  var S = load('hai_settings', {teams:3, names:['Команда 1','Команда 2','Команда 3','Команда 4'], timer:30, sound:true});
+  var G = null;      // game state
+  var timerId = null;
+
+  /* ---------- Setup screen ---------- */
+  function setup(){
+    stopTimer(); clear(app); G = null;
+    var namesBox = h('div',{class:'names'});
+    function drawNames(){
+      clear(namesBox);
+      for(var i=0;i<S.teams;i++){
+        (function(i){
+          var inp = h('input',{type:'text',id:'tn'+i,maxlength:'24','aria-label':'Название команды '+(i+1),value:S.names[i]});
+          inp.addEventListener('input', function(){ S.names[i] = inp.value || ('Команда '+(i+1)); store('hai_settings', S); });
+          namesBox.appendChild(inp);
+        })(i);
+      }
+      if(S.teams===1) namesBox.appendChild(h('p',{class:'hint',text:'Один «класс» голосует вместе: достаточно нажать на выбранный отрывок.'}));
+    }
+    function seg(label, opts, cur, set){
+      var box = h('div',{class:'seg',role:'group','aria-label':label});
+      opts.forEach(function(o){
+        var b = h('button',{type:'button','aria-pressed':String(o.v===cur),text:o.t,onclick:function(){ set(o.v); }});
+        box.appendChild(b);
+      });
+      return box;
+    }
+    function render(){
+      clear(app);
+      app.appendChild(h('div',{},[
+        h('p',{class:'kind',text:'Игра для урока · 10 раундов'}),
+        h('h1',{text:'Человек или ИИ?'}),
+        h('p',{class:'lead',text:'В каждом раунде два варианта: настоящий и созданный нейросетью. Команды угадывают, где ИИ. За правильный ответ 100 очков, за серию подряд бонус.'})
+      ]));
+      var how = h('div',{class:'how'},[
+        h('div',{},[h('b',{text:'Смотрим'}),'Картинки и отрывки из классики рядом с текстами и картинками ИИ.']),
+        h('div',{},[h('b',{text:'Спорим'}),'Команды обсуждают признаки и выбирают А или Б.']),
+        h('div',{},[h('b',{text:'Проверяем'}),'Ответ с источником и подсказкой, как заметить подделку.'])
+      ]);
+      app.appendChild(how);
+      var p = h('div',{class:'panel setup'});
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Сколько команд'}), seg('Сколько команд',[{v:1,t:'Весь класс'},{v:2,t:'2'},{v:3,t:'3'},{v:4,t:'4'}],S.teams,function(v){S.teams=v;store('hai_settings',S);render();})]));
+      drawNames(); p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Названия команд'}), namesBox]));
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Таймер на раунд'}), seg('Таймер',[{v:0,t:'Без таймера'},{v:20,t:'20 с'},{v:30,t:'30 с'},{v:45,t:'45 с'}],S.timer,function(v){S.timer=v;store('hai_settings',S);render();})]));
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Звук'}), seg('Звук',[{v:true,t:'Включён'},{v:false,t:'Выключен'}],S.sound,function(v){S.sound=v;store('hai_settings',S);render();})]));
+      p.appendChild(h('div',{class:'row'},[h('button',{class:'btn',type:'button',text:'Начать игру',onclick:start})]));
+      app.appendChild(p);
+    }
+    render();
+  }
+
+  /* ---------- Game ---------- */
+  function start(){
+    G = { i:0, revealed:false, picks:[], teams:[] };
+    for(var t=0;t<S.teams;t++) G.teams.push({name:S.names[t]||('Команда '+(t+1)), score:0, streak:0, right:0});
+    tone(440,.1,'triangle',.1,0); tone(660,.2,'triangle',.1,.1);
+    round();
+  }
+
+  function stopTimer(){ if(timerId){ clearInterval(timerId); timerId = null; } }
+
+  function round(){
+    stopTimer(); clear(app);
+    var r = rounds[G.i];
+    G.revealed = false; G.picks = G.teams.map(function(){ return null; });
+    var aiIdx = r.aiFirst ? 0 : 1;
+    G.aiIdx = aiIdx;
+
+    // header
+    var chips = h('div',{class:'chips'}, G.teams.map(function(t,k){
+      return h('div',{class:'chip',id:'chip'+k},[h('small',{text:t.name}), h('span',{text:t.score+' очк.'+(t.streak>1?' · серия '+t.streak:'')})]);
+    }));
+    var dots = h('div',{class:'progress','aria-hidden':'true'}, rounds.map(function(_,k){ return h('span',{class:'dot'+(k===G.i?' now':'')}); }));
+    var timerEl = null;
+    if(S.timer>0){
+      timerEl = h('div',{class:'timer',id:'timer','aria-label':'Таймер'});
+      timerEl.innerHTML = '<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="var(--line)" stroke-width="6"/><circle id="ring" cx="32" cy="32" r="28" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="0"/></svg><span id="tnum"></span>';
+    }
+    app.appendChild(h('div',{class:'top'},[
+      h('div',{},[h('p',{class:'kind',text:'Раунд '+(G.i+1)+' из '+rounds.length+' · '+(r.kind==='image'?'картинки':'тексты')}), dots]),
+      chips, timerEl
+    ]));
+    app.appendChild(h('h2',{text: r.kind==='image' ? 'Какая картинка создана ИИ?' : 'Какой отрывок написал ИИ?'}));
+
+    // cards
+    var stage = h('div',{class:'stage',id:'stage'});
+    var items = r.aiFirst ? [{o:r.ai,ai:true},{o:r.real,ai:false}] : [{o:r.real,ai:false},{o:r.ai,ai:true}];
+    items.forEach(function(it,k){
+      var card = h('div',{class:'card','data-k':k});
+      card.appendChild(h('span',{class:'tag',text:(k===0?'Вариант А':'Вариант Б')}));
+      if(r.kind==='image'){
+        var box = h('div',{class:'imgbox'});
+        box.appendChild(h('img',{src:it.o.src,alt:'Вариант '+(k===0?'А':'Б')+': изображение'}));
+        box.appendChild(h('button',{class:'zoom',type:'button',text:'Увеличить',onclick:function(){ openLb(it.o.src); }}));
+        card.appendChild(box);
+      } else {
+        card.appendChild(h('p',{class:'text',text:it.o.text}));
+      }
+      card.appendChild(h('span',{class:'badge',text: it.ai ? (r.kind==='image' ? 'Создано ИИ (GPT Image)' : 'Написал ИИ (Claude)') : (r.kind==='image'?'Настоящее фото':'Написал человек')}));
+      var src = h('p',{class:'source'});
+      if(it.ai){ src.textContent = r.kind==='image' ? 'Картинка сгенерирована нейросетью специально для этой игры.' : 'Текст создан для этой игры.'; }
+      else if(r.kind==='image'){ src.appendChild(h('a',{href:r.real.url,target:'_blank',rel:'noopener',text:r.real.credit})); src.appendChild(document.createTextNode('. Изображение уменьшено.')); }
+      else src.textContent = r.real.src;
+      card.appendChild(src);
+      if(G.teams.length===1){
+        card.appendChild(h('button',{class:'pick',type:'button',text:'Выбираем '+(k===0?'А':'Б'),onclick:function(){ G.picks[0]=k; reveal(); }}));
+      }
+      stage.appendChild(card);
+    });
+    app.appendChild(stage);
+
+    // team votes
+    if(G.teams.length>1){
+      var votes = h('div',{class:'votes',id:'votes'});
+      G.teams.forEach(function(t,ti){
+        var row = h('div',{class:'vote'},[h('span',{class:'nm',text:t.name})]);
+        var sg = h('div',{class:'seg',role:'group','aria-label':'Выбор команды '+t.name});
+        ['А','Б'].forEach(function(lab,k){
+          sg.appendChild(h('button',{type:'button','aria-pressed':'false',text:lab,onclick:function(){
+            if(G.revealed) return; G.picks[ti]=k;
+            Array.prototype.forEach.call(sg.children,function(b,bi){ b.setAttribute('aria-pressed', String(bi===k)); });
+            updateReveal();
+          }}));
+        });
+        row.appendChild(sg); row.appendChild(h('span',{class:'res',id:'res'+ti}));
+        votes.appendChild(row);
+      });
+      app.appendChild(votes);
+    }
+
+    var actions = h('div',{class:'row',id:'actions'});
+    if(G.teams.length>1){
+      actions.appendChild(h('button',{class:'btn',id:'revealBtn',type:'button',text:'Показать ответ',onclick:reveal}));
+    }
+    app.appendChild(actions);
+    app.appendChild(h('div',{id:'verdict'}));
+    if(G.teams.length>1) app.appendChild(h('p',{class:'hint',id:'hint',text:'Команды обсуждают и выбирают А или Б. Нажмите «Показать ответ», когда все готовы.'}));
+    else app.appendChild(h('p',{class:'hint',id:'hint',text:'Обсудите в классе, потом нажмите на выбранный вариант.'}));
+
+    if(S.timer>0) runTimer(S.timer);
+  }
+
+  function updateReveal(){ /* hook for future use */ }
+
+  function runTimer(sec){
+    var left = sec, ring = document.getElementById('ring'), num = document.getElementById('tnum');
+    function paint(){
+      if(num) num.textContent = left;
+      if(ring) ring.setAttribute('stroke-dashoffset', String(175.9*(1-left/sec)));
+      if(ring) ring.setAttribute('stroke', left<=5 ? 'var(--bad)' : 'var(--accent)');
+    }
+    paint();
+    timerId = setInterval(function(){
+      left--; paint();
+      if(left<=5 && left>0) sfxTick();
+      if(left<=0){ stopTimer(); reveal(); }
+    },1000);
+  }
+
+  function reveal(){
+    if(G.revealed) return;
+    G.revealed = true; stopTimer();
+    var r = rounds[G.i], ai = G.aiIdx, anyOk = false, anyNo = false;
+    var stage = document.getElementById('stage');
+    Array.prototype.forEach.call(stage.children,function(c,k){
+      c.classList.add('reveal'); c.classList.add(k===ai?'is-ai':'is-human');
+    });
+    var gains = G.teams.map(function(t,ti){
+      var p = G.picks[ti];
+      if(p===null){ t.streak = 0; return {txt:'нет ответа', ok:false, none:true}; }
+      if(p===ai){ var bonus = 50*Math.min(t.streak,3); t.streak++; t.right++; var g = 100+bonus; t.score += g; anyOk = true; return {txt:'+'+g, ok:true}; }
+      t.streak = 0; anyNo = true; return {txt:'мимо', ok:false};
+    });
+    if(G.teams.length>1){
+      gains.forEach(function(g,ti){
+        var s = document.getElementById('res'+ti); s.textContent = g.txt; s.className = 'res '+(g.ok?'ok':'no');
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('#votes button'),function(b){ b.disabled = true; });
+      var rb = document.getElementById('revealBtn'); if(rb) rb.hidden = true;
+    }
+    var allOk = gains.every(function(g){ return g.ok; });
+    var v = document.getElementById('verdict');
+    var head = G.teams.length===1 ? (gains[0].ok ? 'Класс угадал: ИИ был здесь' : (gains[0].none ? 'Время вышло' : 'Не угадали: это настоящий вариант')) : (anyOk ? 'Кто-то из команд нашёл ИИ' : 'Никто не нашёл ИИ');
+    v.className = 'verdict';
+    v.appendChild(h('h2',{text:head}));
+    v.appendChild(h('p',{text:r.clue}));
+    var last = G.i===rounds.length-1;
+    document.getElementById('actions').appendChild(h('button',{class:'btn',type:'button',text:last?'Показать итог':'Следующий раунд',onclick:function(){ if(last) finish(); else { G.i++; round(); window.scrollTo(0,0); } }}));
+    document.getElementById('hint').hidden = true;
+    // refresh scoreboard chips
+    G.teams.forEach(function(t,k){ var c=document.getElementById('chip'+k); if(c){ c.lastChild.textContent = t.score+' очк.'+(t.streak>1?' · серия '+t.streak:''); } });
+    if(anyOk){ sfxOk(); confetti(); } else sfxNo();
+    var firstBtn = document.querySelector('#actions .btn'); if(firstBtn) firstBtn.focus();
+  }
+
+  function finish(){
+    stopTimer(); clear(app);
+    var order = G.teams.slice().sort(function(a,b){ return b.score-a.score; });
+    app.appendChild(h('div',{},[h('p',{class:'kind',text:'Итог игры'}), h('h1',{text: G.teams.length===1 ? 'Класс набрал '+order[0].score+' очков' : (order[0].score===order[1].score ? 'Ничья: лидеры набрали по '+order[0].score+' очков' : 'Победила команда «'+order[0].name+'»')})]));
+    var pod = h('div',{class:'podium'});
+    order.forEach(function(t,k){
+      pod.appendChild(h('div',{class:'place'+(k===0?' first':'')},[h('span',{class:'n',text:String(k+1)}),h('span',{class:'nm',text:t.name}),h('span',{class:'pt',text:t.score+' очк. · '+t.right+' из '+rounds.length})]));
+    });
+    app.appendChild(pod);
+    var p = h('div',{class:'panel',style:'display:flex;flex-direction:column;gap:14px'});
+    p.appendChild(h('h2',{text:'Что выдаёт ИИ'}));
+    var ul = h('ul',{class:'signs'});
+    ['Слишком идеально: симметрия, чистые цвета, гладкий текст без неожиданностей.','Общие слова вместо конкретных деталей (имя, предмет, цифра).','Ошибки в мелочах: руки и лапы, отражения, надписи, тени.','Мораль и вывод в конце текста: «именно это делает нас…».'].forEach(function(s){ ul.appendChild(h('li',{text:s})); });
+    p.appendChild(ul);
+    p.appendChild(h('p',{class:'hint',text:'Но модели быстро улучшаются, и угадывать по ощущению ненадёжно. Надёжнее проверять источник: кто автор, где оригинал, есть ли метка «создано ИИ».'}));
+    app.appendChild(p);
+    app.appendChild(h('div',{class:'row'},[h('button',{class:'btn',type:'button',text:'Играть заново',onclick:start}),h('button',{class:'btn ghost',type:'button',text:'Настройки',onclick:setup})]));
+    sfxOk(); confetti();
+    window.scrollTo(0,0);
+  }
+
+  /* ---------- Lightbox ---------- */
+  var lb = document.getElementById('lightbox'), lbImg = document.getElementById('lbImg');
+  function openLb(src){ lbImg.src = src; lb.hidden = false; document.getElementById('lbClose').focus(); }
+  function closeLb(){ lb.hidden = true; }
+  document.getElementById('lbClose').addEventListener('click', closeLb);
+  lb.addEventListener('click', function(e){ if(e.target===lb) closeLb(); });
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeLb(); });
+
+  setup();
+})();
+</script>
+</body>
+</html>
