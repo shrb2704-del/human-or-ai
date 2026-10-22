@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Стартап-детектив</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=PT+Serif:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: classroom big-screen quiz. Setup, rounds (one or two cards + team vote rows + reveal), final podium. */
+:root{
+  --bg:#EEF0F7; --surface:#FFFFFF; --ink:#12163A; --muted:#545A7C; --line:#D3D8EB;
+  --accent:#2B4BD6; --accent-ink:#FFFFFF; --warm:#FFB547; --warm-ink:#12163A; --good:#1F8A5B; --bad:#C0392B;
+  --serif:'PT Serif', Georgia, 'Times New Roman', serif;
+  --sans:'Manrope','Segoe UI',Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0D1030; --surface:#171B47; --ink:#F1F2FA; --muted:#A9AFD6; --line:#2C3270;
+    --accent:#7C98FF; --accent-ink:#0D1030; --good:#48C58F; --bad:#FF7A6B; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0D1030; --surface:#171B47; --ink:#F1F2FA; --muted:#A9AFD6; --line:#2C3270;
+  --accent:#7C98FF; --accent-ink:#0D1030; --good:#48C58F; --bad:#FF7A6B; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);padding-inline:16px;padding-block:20px 56px;line-height:1.5}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1{font-size:clamp(30px,5vw,56px);line-height:1.05;margin:0;font-weight:800;letter-spacing:-.02em;text-wrap:balance}
+h2{margin:0;text-wrap:balance}
+.lead{color:var(--muted);margin:0;font-size:clamp(17px,2vw,20px);max-width:66ch}
+.btn{font:inherit;font-weight:700;font-size:18px;background:var(--accent);color:var(--accent-ink);border:0;border-radius:10px;padding:12px 26px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.btn:focus-visible,.seg button:focus-visible,.pick:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.label{font-weight:800;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.setup{display:grid;gap:20px}
+.field{display:flex;flex-direction:column;gap:10px}
+.seg{display:flex;gap:8px;flex-wrap:wrap}
+.seg button{font:inherit;font-weight:700;background:transparent;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:8px 18px;cursor:pointer;min-width:56px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.seg button:disabled{opacity:.6;cursor:default}
+.names{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.names input{font:inherit;padding:10px 12px;border-radius:8px;border:2px solid var(--line);background:var(--bg);color:var(--ink);min-width:0}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.how div{border-left:4px solid var(--warm);padding-left:12px}
+.how b{display:block}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.chips{display:flex;gap:10px;flex-wrap:wrap}
+.chip{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:6px 14px;font-weight:700;font-variant-numeric:tabular-nums}
+.chip small{display:block;font-weight:600;color:var(--muted);font-size:13px}
+.bar{height:8px;background:var(--line);border-radius:999px;overflow:hidden;width:min(320px,100%)}
+.bar i{display:block;height:100%;background:var(--accent)}
+.kind{font-weight:800;font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.timer{position:relative;width:64px;height:64px}
+.timer svg{transform:rotate(-90deg)}
+.timer span{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:22px;font-variant-numeric:tabular-nums}
+.stage{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.stage.one{grid-template-columns:minmax(0,820px)}
+@media (max-width:760px){.stage{grid-template-columns:1fr}}
+.card{background:var(--surface);border:3px solid var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.card .tag{font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:14px;color:var(--muted)}
+.text{font-family:var(--serif);font-size:clamp(20px,2.2vw,26px);line-height:1.5;margin:0}
+.pick{font:inherit;font-weight:800;font-size:18px;background:transparent;color:var(--ink);border:2px solid var(--line);border-radius:10px;padding:10px 16px;cursor:pointer;margin-top:auto}
+.pick:hover{border-color:var(--accent)}
+.badge{display:none;align-self:flex-start;font-weight:800;font-size:16px;padding:6px 12px;border-radius:8px}
+.reveal .badge{display:inline-block}
+.reveal .pick{display:none}
+.card.is-bad{border-color:var(--warm)}
+.card.is-bad .badge{background:var(--warm);color:var(--warm-ink)}
+.card.is-good{border-color:var(--good)}
+.card.is-good .badge{background:var(--good);color:#fff}
+.votes{display:grid;gap:10px}
+.vote{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;flex-wrap:wrap}
+.vote .nm{font-weight:800;min-width:140px;flex:1}
+.vote .res{font-weight:800;font-variant-numeric:tabular-nums}
+.vote .res.ok{color:var(--good)} .vote .res.no{color:var(--bad)}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 24px;display:flex;flex-direction:column;gap:6px}
+.verdict h2{font-size:26px}
+.verdict p{margin:0;font-size:18px;max-width:72ch}
+.podium{display:grid;gap:12px}
+.place{display:flex;align-items:center;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 22px;flex-wrap:wrap}
+.place .n{font-weight:800;font-size:34px;width:44px;color:var(--muted)}
+.place.first{border-color:var(--warm);border-width:3px}
+.place .nm{font-weight:800;font-size:24px;flex:1;min-width:0;overflow-wrap:anywhere}
+.place .pt{font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
+.signs{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:8px;font-size:19px;max-width:72ch}
+#confetti{position:fixed;inset:0;pointer-events:none;z-index:15}
+[hidden]{display:none!important}
+.hint{color:var(--muted);margin:0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div class="wrap" id="app"></div>
+
+<script>
+(function(){
+  /* ---------- Data ---------- */
+  var KIND = { prob:'проблема или решение', ask:'вопрос клиенту', prompt:'запрос к ИИ', stmt:'формулировка проблемы' };
+  var HEAD = {
+    prob:'Это проблема клиента или решение?',
+    ask:'Хороший вопрос для интервью или плохой?',
+    prompt:'Какой запрос к ИИ лучше?',
+    stmt:'Какая формулировка проблемы лучше?'
+  };
+  var rounds = [
+    /* problem or solution (single statement) */
+    { kind:'prob', text:'Нужно приложение, которое будет учить английскому.', correct:1,
+      clue:'Это решение: готовый продукт, но нет человека и ситуации. Проблема звучала бы так: «ученик хочет говорить по-английски, но боится ошибок, потому что стесняется перед классом».' },
+    { kind:'prob', text:'Ученики забывают про домашку, потому что задания приходят в разные чаты.', correct:0,
+      clue:'Это проблема: есть кто (ученики), что происходит и почему. Решение пока не названо.' },
+    { kind:'prob', text:'Сделаем ИИ, который придумывает настольные игры.', correct:1,
+      clue:'Это решение. Сначала нужно понять, у кого проблема: например, у компании друзей, которая не знает, во что поиграть вечером.' },
+    { kind:'prob', text:'Школьникам трудно придумать идею для проекта, и они сидят над пустым листом.', correct:0,
+      clue:'Это проблема: названы люди и их затруднение. Решением может быть ИИ-помощник, но это уже следующий шаг.' },
+    { kind:'prob', text:'Создадим бота, который напоминает об экзаменах.', correct:1,
+      clue:'Это решение. Проблему нужно сформулировать так: «ученик пропускает дедлайны, потому что не видит всех дат в одном месте».' },
+    { kind:'prob', text:'Девятиклассникам сложно понять, на какие кружки записаться, и они выбирают наугад.', correct:0,
+      clue:'Это проблема: есть кто, что мешает и как это выглядит. Решений может быть много.' },
+    { kind:'prob', text:'Нужна нейросеть, которая пишет сочинения за школьников.', correct:1,
+      clue:'Это решение, причём спорное: оно создаёт новые проблемы. Хорошая проблема описывает трудность человека, а не готовый продукт.' },
+    { kind:'prob', text:'Младшие ученики не понимают объяснения учителя и стесняются переспросить.', correct:0,
+      clue:'Это проблема. Видно, у кого она возникает и почему, а продукта в формулировке нет.' },
+
+    /* interview question: good or bad */
+    { kind:'ask', text:'Тебе понравится приложение, которое помогает готовиться к экзаменам?', correct:1,
+      clue:'Плохой вопрос. Он про будущее и наводящий. Люди из вежливости отвечают «да».' },
+    { kind:'ask', text:'Расскажи, как ты готовился к последней контрольной. Что было сложно?', correct:0,
+      clue:'Хороший вопрос. Он про конкретный случай в прошлом и открывает историю.' },
+    { kind:'ask', text:'Ты бы стал этим пользоваться, если бы оно было бесплатным?', correct:1,
+      clue:'Плохой вопрос. «Если бы» и «стал бы» это гипотеза. Лучше спросить, чем человек пользуется сейчас.' },
+    { kind:'ask', text:'Чем ты пользуешься сейчас, чтобы не забывать про дедлайны?', correct:0,
+      clue:'Хороший вопрос. Он показывает, как человек решает проблему сейчас.' },
+    { kind:'ask', text:'Согласен, что учиться по скучным учебникам тяжело?', correct:1,
+      clue:'Плохой вопрос. Он подсказывает ответ. Человек просто соглашается.' },
+    { kind:'ask', text:'Что в этом было самым неудобным?', correct:0,
+      clue:'Хороший вопрос. Он помогает найти настоящую боль в рассказанной истории.' },
+    { kind:'ask', text:'Если я сделаю такой сайт, ты расскажешь о нём друзьям?', correct:1,
+      clue:'Плохой вопрос. Это гипотетическое обещание. Надёжнее спросить о том, что человек уже делал.' },
+    { kind:'ask', text:'Сколько времени в неделю у тебя уходит на домашку по этому предмету?', correct:0,
+      clue:'Хороший вопрос. Он про реальную жизнь и даёт цифру.' },
+
+    /* prompts: pick the better one (A or B) */
+    { kind:'prompt', correct:1,
+      a:'Придумай идею для проекта.',
+      b:'Ты помогаешь школьной команде 9 класса. Предложи 10 идей ИИ-проектов для учёбы, которые можно проверить за 2 недели без программирования. Ответ в таблице: идея, для кого, как проверить.',
+      clue:'Лучше Б. В нём есть роль, контекст, ограничения и формат. Из варианта А получится общий ответ.' },
+    { kind:'prompt', correct:0,
+      a:'Ты помогаешь составить вопросы для интервью. Мы изучаем проблему «ученики забывают про домашку». Напиши 5 вопросов про прошлый опыт, без наводящих.',
+      b:'Напиши вопросы про домашку.',
+      clue:'Лучше А. В нём цель, контекст, количество и ограничение. Вариант Б даст случайный набор.' },
+    { kind:'prompt', correct:1,
+      a:'Скажи, что моя идея отличная.',
+      b:'Найди 5 слабых мест в идее «ИИ-репетитор по алгебре» и для каждого предложи, как проверить на реальных людях.',
+      clue:'Лучше Б. Вариант А просит похвалу, и вы ничего не узнаете. Слабые места дают план проверки.' },
+    { kind:'prompt', correct:0,
+      a:'Дай 10 идей игры для 9 класса. Исключи викторины. Отдельно предложи 3 необычные идеи.',
+      b:'Дай идеи игр.',
+      clue:'Лучше А. Он сужает тему и исключает банальное. Б слишком общий.' },
+
+    /* problem statements: pick the better one (A or B) */
+    { kind:'stmt', correct:1,
+      a:'Нужно приложение для запоминания слов.',
+      b:'Ученик 9 класса хочет выучить слова к тесту, но быстро забывает, потому что повторяет их один раз перед уроком.',
+      clue:'Лучше Б. Есть кто, что хочет, что мешает и почему. Вариант А это уже продукт.' },
+    { kind:'stmt', correct:0,
+      a:'Ученики хотят проводить школьные мероприятия, но не знают, как всё организовать, поэтому планы остаются на словах.',
+      b:'Сделаем сайт для школьных мероприятий.',
+      clue:'Лучше А. Он описывает людей, желание и причину. Вариант Б сразу предлагает решение.' },
+    { kind:'stmt', correct:1,
+      a:'Школьники не любят читать.',
+      b:'Ученик 9 класса хочет прочитать книгу по литературе, но бросает на середине, потому что не понимает, что важно запомнить.',
+      clue:'Лучше Б. Он конкретен. Вариант А слишком общий: из него нельзя сделать вопросы для интервью.' },
+    { kind:'stmt', correct:0,
+      a:'Любители настольных игр хотят собрать компанию на вечер, но не могут выбрать игру, потому что у всех разные вкусы.',
+      b:'Нужен ИИ, который придумывает игры.',
+      clue:'Лучше А. В нём видно, у кого проблема и в чём она. Б это идея без проблемы.' }
+  ];
+  var R = rounds;
+
+  function labelsFor(r){
+    if(r.kind==='prob') return ['Проблема','Решение'];
+    if(r.kind==='ask') return ['Хороший','Плохой'];
+    return ['А','Б'];
+  }
+  function isBin(r){ return r.kind==='prob' || r.kind==='ask'; }
+
+  /* ---------- Helpers ---------- */
+  var app = document.getElementById('app');
+  function h(tag, attrs, kids){
+    var n = document.createElement(tag);
+    if(attrs) for(var k in attrs){
+      if(k==='class') n.className = attrs[k];
+      else if(k==='text') n.textContent = attrs[k];
+      else if(k.indexOf('on')===0) n.addEventListener(k.slice(2), attrs[k]);
+      else n.setAttribute(k, attrs[k]);
+    }
+    (kids||[]).forEach(function(c){ if(c) n.appendChild(typeof c==='string' ? document.createTextNode(c) : c); });
+    return n;
+  }
+  function clear(n){ while(n.firstChild) n.removeChild(n.firstChild); }
+  function store(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  function load(k, d){ try{ var v = localStorage.getItem(k); return v===null ? d : JSON.parse(v); }catch(e){ return d; } }
+  function shuffle(a){ a = a.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+
+  /* ---------- Sound and confetti ---------- */
+  var actx = null;
+  function tone(freq, dur, type, vol, delay){
+    if(!S.sound) return;
+    try{
+      actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+      var o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + (delay||0);
+      o.type = type||'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol||0.12, t); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur);
+    }catch(e){}
+  }
+  function sfxOk(){ tone(523,.15,'triangle',.14,0); tone(659,.15,'triangle',.14,.12); tone(784,.28,'triangle',.14,.24); }
+  function sfxNo(){ tone(220,.3,'sawtooth',.08,0); tone(165,.4,'sawtooth',.08,.18); }
+  function sfxTick(){ tone(880,.06,'square',.05,0); }
+  var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function confetti(){
+    if(reduce) return;
+    var c = document.getElementById('confetti'), x = c.getContext('2d');
+    c.width = innerWidth; c.height = innerHeight;
+    var cols = ['#FFB547','#2B4BD6','#1F8A5B','#FF6B6B','#7C98FF'], ps = [];
+    for(var i=0;i<110;i++) ps.push({x:Math.random()*c.width,y:-20-Math.random()*c.height*.4,vx:(Math.random()-.5)*3,vy:2+Math.random()*4,s:6+Math.random()*7,r:Math.random()*6,vr:(Math.random()-.5)*.3,c:cols[i%cols.length]});
+    var f = 0;
+    (function step(){
+      x.clearRect(0,0,c.width,c.height);
+      ps.forEach(function(p){ p.x+=p.vx; p.y+=p.vy; p.r+=p.vr; x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.fillStyle=p.c; x.fillRect(-p.s/2,-p.s/3,p.s,p.s*.6); x.restore(); });
+      if(++f<150) requestAnimationFrame(step); else x.clearRect(0,0,c.width,c.height);
+    })();
+  }
+
+  /* ---------- State ---------- */
+  var S = load('detective9_settings', {teams:3, names:['Команда 1','Команда 2','Команда 3','Команда 4'], timer:30, sound:true, count:12, hard:false});
+  var G = null, timerId = null;
+  function stopTimer(){ if(timerId){ clearInterval(timerId); timerId = null; } }
+
+  /* ---------- Setup ---------- */
+  function setup(){
+    stopTimer(); clear(app); G = null;
+    function seg(label, opts, cur, set){
+      var box = h('div',{class:'seg',role:'group','aria-label':label});
+      opts.forEach(function(o){ box.appendChild(h('button',{type:'button','aria-pressed':String(o.v===cur),text:o.t,onclick:function(){ set(o.v); }})); });
+      return box;
+    }
+    function put(k,v){ S[k]=v; store('detective9_settings', S); render(); }
+    function render(){
+      clear(app);
+      app.appendChild(h('div',{},[
+        h('p',{class:'kind',text:'Урок 2 · 9 класс · проблема и идея'}),
+        h('h1',{text:'Стартап-детектив'}),
+        h('p',{class:'lead',text:'Четыре типа раундов по теме урока: отличить проблему от решения, выбрать хороший вопрос для интервью, лучший запрос к ИИ и точную формулировку проблемы.'})
+      ]));
+      app.appendChild(h('div',{class:'how'},[
+        h('div',{},[h('b',{text:'Проблема или решение'}),'Задача стартапа начинается с проблемы человека.']),
+        h('div',{},[h('b',{text:'Вопросы клиенту'}),'Хорошие вопросы про прошлое, плохие про «а бы ты?».']),
+        h('div',{},[h('b',{text:'ИИ-запросы'}),'Роль, контекст, задача, формат, ограничения.'])
+      ]));
+      var p = h('div',{class:'panel setup'});
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Сколько команд'}), seg('Сколько команд',[{v:1,t:'Весь класс'},{v:2,t:'2'},{v:3,t:'3'},{v:4,t:'4'}],S.teams,function(v){put('teams',v);})]));
+      var nb = h('div',{class:'names'});
+      for(var i=0;i<S.teams;i++){ (function(i){
+        var inp = h('input',{type:'text',id:'tn'+i,maxlength:'24','aria-label':'Название команды '+(i+1),value:S.names[i]});
+        inp.addEventListener('input', function(){ S.names[i] = inp.value || ('Команда '+(i+1)); store('detective9_settings', S); });
+        nb.appendChild(inp);
+      })(i); }
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text: S.teams===1 ? 'Название' : 'Названия команд'}), nb]));
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Сколько раундов'}), seg('Раундов',[{v:8,t:'8 (≈10 мин)'},{v:12,t:'12 (≈15 мин)'},{v:24,t:'Все 24'}],S.count,function(v){put('count',v);})]));
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Режим'}), seg('Режим',[{v:false,t:'Обычный'},{v:true,t:'Сложный: −50 за ошибку'}],S.hard,function(v){put('hard',v);})]));
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Таймер на раунд'}), seg('Таймер',[{v:0,t:'Без таймера'},{v:20,t:'20 с'},{v:30,t:'30 с'},{v:45,t:'45 с'}],S.timer,function(v){put('timer',v);})]));
+      p.appendChild(h('div',{class:'field'},[h('span',{class:'label',text:'Звук'}), seg('Звук',[{v:true,t:'Включён'},{v:false,t:'Выключен'}],S.sound,function(v){put('sound',v);})]));
+      p.appendChild(h('div',{class:'row'},[h('button',{class:'btn',type:'button',text:'Начать игру',onclick:start})]));
+      app.appendChild(p);
+    }
+    render();
+  }
+
+  /* ---------- Game ---------- */
+  function start(){
+    R = shuffle(rounds).slice(0, Math.min(S.count, rounds.length));
+    G = { i:0, revealed:false, picks:[], teams:[], byKind:{} };
+    for(var t=0;t<S.teams;t++) G.teams.push({name:S.names[t]||('Команда '+(t+1)), score:0, streak:0, right:0, kind:{prob:0,ask:0,prompt:0,stmt:0}});
+    R.forEach(function(r){ G.byKind[r.kind] = (G.byKind[r.kind]||0)+1; });
+    tone(440,.1,'triangle',.1,0); tone(660,.2,'triangle',.1,.1);
+    round();
+  }
+
+  function round(){
+    stopTimer(); clear(app);
+    var r = R[G.i], labs = labelsFor(r);
+    G.revealed = false; G.picks = G.teams.map(function(){ return null; });
+    G.correct = r.correct;
+
+    var chips = h('div',{class:'chips'}, G.teams.map(function(t,k){
+      return h('div',{class:'chip',id:'chip'+k},[h('small',{text:t.name}), h('span',{text:t.score+' очк.'+(t.streak>1?' · серия '+t.streak:'')})]);
+    }));
+    var bar = h('div',{class:'bar','aria-hidden':'true'},[h('i',{style:'width:'+Math.round((G.i/R.length)*100)+'%'})]);
+    var timerEl = null;
+    if(S.timer>0){
+      timerEl = h('div',{class:'timer','aria-label':'Таймер'});
+      timerEl.innerHTML = '<svg width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="28" fill="none" stroke="var(--line)" stroke-width="6"/><circle id="ring" cx="32" cy="32" r="28" fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="0"/></svg><span id="tnum"></span>';
+    }
+    app.appendChild(h('div',{class:'top'},[
+      h('div',{},[h('p',{class:'kind',text:'Раунд '+(G.i+1)+' из '+R.length+' · '+KIND[r.kind]+(S.hard?' · сложный режим':'')}), bar]),
+      chips, timerEl
+    ]));
+    app.appendChild(h('h2',{text:HEAD[r.kind]}));
+
+    var stage = h('div',{class:'stage'+(isBin(r)?' one':''),id:'stage'});
+    if(isBin(r)){
+      var card = h('div',{class:'card'});
+      card.appendChild(h('span',{class:'tag',text: r.kind==='prob' ? 'Утверждение' : 'Вопрос клиенту'}));
+      card.appendChild(h('p',{class:'text',text:r.text}));
+      card.appendChild(h('span',{class:'badge',text:labs[r.correct]}));
+      if(G.teams.length===1){
+        var rowb = h('div',{class:'row'});
+        labs.forEach(function(lb,bk){ rowb.appendChild(h('button',{class:'pick',type:'button',text:lb,onclick:function(){ G.picks[0]=bk; reveal(); }})); });
+        card.appendChild(rowb);
+      }
+      stage.appendChild(card);
+    } else {
+      [r.a, r.b].forEach(function(txt,k){
+        var c = h('div',{class:'card'});
+        c.appendChild(h('span',{class:'tag',text:'Вариант '+labs[k]}));
+        c.appendChild(h('p',{class:'text',text:txt}));
+        c.appendChild(h('span',{class:'badge',text: k===r.correct ? 'Лучше этот' : 'Слабее'}));
+        if(G.teams.length===1) c.appendChild(h('button',{class:'pick',type:'button',text:'Выбираем '+labs[k],onclick:function(){ G.picks[0]=k; reveal(); }}));
+        stage.appendChild(c);
+      });
+    }
+    app.appendChild(stage);
+
+    if(G.teams.length>1){
+      var votes = h('div',{class:'votes',id:'votes'});
+      G.teams.forEach(function(t,ti){
+        var row = h('div',{class:'vote'},[h('span',{class:'nm',text:t.name})]);
+        var sg = h('div',{class:'seg',role:'group','aria-label':'Выбор команды '+t.name});
+        labs.forEach(function(lab,k){
+          sg.appendChild(h('button',{type:'button','aria-pressed':'false',text:lab,onclick:function(){
+            if(G.revealed) return; G.picks[ti]=k;
+            Array.prototype.forEach.call(sg.children,function(b,bi){ b.setAttribute('aria-pressed', String(bi===k)); });
+          }}));
+        });
+        row.appendChild(sg); row.appendChild(h('span',{class:'res',id:'res'+ti}));
+        votes.appendChild(row);
+      });
+      app.appendChild(votes);
+    }
+    var actions = h('div',{class:'row',id:'actions'});
+    if(G.teams.length>1) actions.appendChild(h('button',{class:'btn',id:'revealBtn',type:'button',text:'Показать ответ',onclick:reveal}));
+    app.appendChild(actions);
+    app.appendChild(h('div',{id:'verdict'}));
+    app.appendChild(h('p',{class:'hint',id:'hint',text: G.teams.length>1 ? 'Команды обсуждают и выбирают вариант. Нажмите «Показать ответ», когда все готовы.' : 'Обсудите в классе, потом нажмите на выбранный вариант.'}));
+    if(S.timer>0) runTimer(S.timer);
+  }
+
+  function runTimer(sec){
+    var left = sec, ring = document.getElementById('ring'), num = document.getElementById('tnum');
+    function paint(){
+      if(num) num.textContent = left;
+      if(ring){ ring.setAttribute('stroke-dashoffset', String(175.9*(1-left/sec))); ring.setAttribute('stroke', left<=5 ? 'var(--bad)' : 'var(--accent)'); }
+    }
+    paint();
+    timerId = setInterval(function(){
+      left--; paint();
+      if(left<=5 && left>0) sfxTick();
+      if(left<=0){ stopTimer(); reveal(); }
+    },1000);
+  }
+
+  function reveal(){
+    if(G.revealed) return;
+    G.revealed = true; stopTimer();
+    var r = R[G.i], ok = G.correct, anyOk = false;
+    var stage = document.getElementById('stage');
+    if(isBin(r)){
+      var c = stage.firstChild; c.classList.add('reveal'); c.classList.add(r.correct===0 ? 'is-good' : 'is-bad');
+    } else {
+      Array.prototype.forEach.call(stage.children,function(c,k){ c.classList.add('reveal'); c.classList.add(k===ok?'is-good':'is-bad'); });
+    }
+    var gains = G.teams.map(function(t,ti){
+      var p = G.picks[ti];
+      if(p===null){ t.streak = 0; return {txt: S.hard ? 'нет ответа, −50' : 'нет ответа', ok:false, none:true}; }
+      if(p===ok){ var bonus = 50*Math.min(t.streak,3); t.streak++; t.right++; t.kind[r.kind]++; var g = 100+bonus; t.score += g; anyOk = true; return {txt:'+'+g, ok:true}; }
+      t.streak = 0; return {txt: S.hard ? 'мимо, −50' : 'мимо', ok:false};
+    });
+    if(S.hard) G.teams.forEach(function(t,ti){ if(!gains[ti].ok) t.score = Math.max(0, t.score-50); });
+    if(G.teams.length>1){
+      gains.forEach(function(g,ti){ var s = document.getElementById('res'+ti); s.textContent = g.txt; s.className = 'res '+(g.ok?'ok':'no'); });
+      Array.prototype.forEach.call(document.querySelectorAll('#votes button'),function(b){ b.disabled = true; });
+      var rb = document.getElementById('revealBtn'); if(rb) rb.hidden = true;
+    }
+    var head = G.teams.length===1 ? (gains[0].ok ? 'Класс прав' : (gains[0].none ? 'Время вышло' : 'Класс ошибся')) : (anyOk ? 'Кто-то из команд ответил верно' : 'Никто не ответил верно');
+    var v = document.getElementById('verdict');
+    v.className = 'verdict';
+    v.appendChild(h('h2',{text:head}));
+    v.appendChild(h('p',{text:r.clue}));
+    var last = G.i===R.length-1;
+    document.getElementById('actions').appendChild(h('button',{class:'btn',type:'button',text:last?'Показать итог':'Следующий раунд',onclick:function(){ if(last) finish(); else { G.i++; round(); window.scrollTo(0,0); } }}));
+    document.getElementById('hint').hidden = true;
+    G.teams.forEach(function(t,k){ var c=document.getElementById('chip'+k); if(c) c.lastChild.textContent = t.score+' очк.'+(t.streak>1?' · серия '+t.streak:''); });
+    if(anyOk){ sfxOk(); confetti(); } else sfxNo();
+    var fb = document.querySelector('#actions .btn'); if(fb) fb.focus();
+  }
+
+  function finish(){
+    stopTimer(); clear(app);
+    var order = G.teams.slice().sort(function(a,b){ return b.score-a.score; });
+    var title = G.teams.length===1 ? 'Класс набрал '+order[0].score+' очков' : (order.length>1 && order[0].score===order[1].score ? 'Ничья: лидеры набрали по '+order[0].score+' очков' : 'Победила команда «'+order[0].name+'»');
+    app.appendChild(h('div',{},[h('p',{class:'kind',text:'Итог игры'}), h('h1',{text:title})]));
+    var pod = h('div',{class:'podium'});
+    order.forEach(function(t,k){
+      var det = ['prob','ask','prompt','stmt'].filter(function(x){ return G.byKind[x]; }).map(function(x){ return KIND[x]+' '+t.kind[x]+'/'+G.byKind[x]; }).join(' · ');
+      pod.appendChild(h('div',{class:'place'+(k===0?' first':'')},[h('span',{class:'n',text:String(k+1)}),h('span',{class:'nm',text:t.name}),h('span',{class:'hint',text:det}),h('span',{class:'pt',text:t.score+' очк.'})]));
+    });
+    app.appendChild(pod);
+    var p = h('div',{class:'panel',style:'display:flex;flex-direction:column;gap:14px'});
+    p.appendChild(h('h2',{text:'Шпаргалка к проекту'}));
+    var ul = h('ul',{class:'signs'});
+    ['Проблема по формуле: «[кто] хочет [что], но [препятствие], потому что [причина]». Решения в ней нет.','Вопросы клиенту: про конкретное прошлое («расскажи про последний раз»), а не «ты бы стал?».','Запрос к ИИ: роль, контекст, задача, формат, ограничения. Просите слабые места, а не похвалу.','Идея побеждает, если проблема сильная, её можно быстро проверить и команде интересно ею заниматься.'].forEach(function(s){ ul.appendChild(h('li',{text:s})); });
+    p.appendChild(ul);
+    app.appendChild(p);
+    app.appendChild(h('div',{class:'row'},[h('button',{class:'btn',type:'button',text:'Играть заново',onclick:start}),h('button',{class:'btn ghost',type:'button',text:'Настройки',onclick:setup})]));
+    sfxOk(); confetti();
+    window.scrollTo(0,0);
+  }
+
+  setup();
+})();
+</script>
+</body>
+</html>
